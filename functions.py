@@ -109,6 +109,57 @@ class DataVisualizer:
         plt.savefig(f'Figures/{df}_{method}_correlation_heatmap.png')
         
         plt.show()
+        
+    def lineplot(self, x: str, y: str, title: str, color: str = 'blue', figsize: tuple = (10, 6), path: str = 'Figures/lineplot.png'):
+        """Plot a lineplot for the given x and y columns
+
+        Parameters
+        ----------
+        x : str
+            Column for the x-axis
+        y : str
+            Column for the y-axis
+        title : str
+            Title of the plot
+        color : str, optional
+            Line color (default is 'blue')
+        figsize : tuple, optional
+            Figure size (default is (10, 6))
+        path : str, optional
+            Path to save the plot (default is 'Figures/lineplot.png')
+
+        Raises
+        ------
+        ValueError
+            If x or y is not a string
+        ValueError
+            If title is not a string
+        KeyError
+            If x or y is not in the dataset
+        """ 
+        
+        if not isinstance(x, str):
+            raise ValueError("x must be a string")
+        
+        if not isinstance(y, str):
+            raise ValueError("y must be a string")
+        
+        if not isinstance(title, str):
+            raise ValueError("title must be a string")
+        
+        if x not in self.data.columns:
+            raise KeyError(f"{x} is not a column in the dataset")
+        
+        if y not in self.data.columns:
+            raise KeyError(f"{y} is not a column in the dataset")
+        
+        plt.figure(figsize=figsize)
+        sns.lineplot(x=x, y=y, data=self.data, color=color)
+        plt.title(title)
+        plt.grid()
+        plt.savefig(path)
+        plt.show()
+            
 class TimeSeriesDecomposer:
     def __init__(self, series: pd.Series, period: int = 12):
         """Constructor for TimeSeriesDecomposer
@@ -119,8 +170,15 @@ class TimeSeriesDecomposer:
             Time series data
         period : int, optional
             Period used for decomposing data, by default 12
+            
+        Raises
+        ------
+        ValueError
+            If series is not a pandas Series
+        ValueError
+            If period is not an integer
         """
-        
+                
         if not isinstance(series, pd.core.series.Series):
             raise ValueError("series must be a pandas Series")
         
@@ -144,7 +202,8 @@ class TimeSeriesDecomposer:
             Series with the seasonal data.
         residual : pd.Series
             Series with the residual data.
-        """        
+        """
+                
         decomposition = seasonal_decompose(self.series, period=self.period)
         self.trend = decomposition.trend
         self.seasonal = decomposition.seasonal
@@ -166,7 +225,21 @@ class TimeSeriesDecomposer:
             Title of the plot, by default 'Decomposition of Time Series'
         save_path : str, optional
             File location and name, by default 'Figures/decomposition.png'
-        """        
+
+        Raises
+        ------
+        ValueError
+            If trend is not a pandas Series
+        ValueError
+            If seasonal is not a pandas Series
+        ValueError
+            If residual is not a pandas Series
+        ValueError
+            If title is not a string
+        ValueError
+            If save_path is not a string
+        """
+                        
         if trend is not None:
             if not isinstance(trend, pd.core.series.Series):
                 raise ValueError("trend must be a pandas Series")
@@ -205,3 +278,34 @@ class TimeSeriesDecomposer:
         plt.tight_layout()
         plt.savefig(save_path)
         plt.show()
+
+def create_features(data: pd.DataFrame):
+    """Create features from the date_hour column
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Dataframe with the date_hour column
+
+    Returns
+    -------
+    data : pd.DataFrame
+        Dataframe with new features
+    
+    Raises
+    ------
+    ValueError
+        If data is not a pandas DataFrame
+    """    
+    
+    if not isinstance(data, pd.core.frame.DataFrame):
+        raise ValueError("data must be a pandas DataFrame")
+        
+    data['date_hour'] = pd.to_datetime(data['date_hour'])
+    data['year'] = data['date_hour'].dt.year
+    data['month'] = data['date_hour'].dt.month
+    data['week'] = data['date_hour'].dt.week
+    data['day'] = data['date_hour'].dt.day
+    data['hour'] = data['date_hour'].dt.hour
+    data['day_of_week'] = data['date_hour'].dt.dayofweek
+    return data
