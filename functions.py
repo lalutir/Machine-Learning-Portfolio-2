@@ -279,7 +279,7 @@ class TimeSeriesDecomposer:
         plt.savefig(save_path)
         plt.show()
 
-def create_features(data: pd.DataFrame):
+def create_timeseries_features(data: pd.DataFrame):
     """Create features from the date_hour column
 
     Parameters
