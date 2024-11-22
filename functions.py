@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import missingno as msno
 from scipy.fft import fft, ifft
+from scipy.signal import find_peaks
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.deterministic import DeterministicProcess
+from statsmodels.tsa.stattools import adfuller
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsRegressor
@@ -309,3 +311,115 @@ def create_timeseries_features(data: pd.DataFrame):
     data['hour'] = data['date_hour'].dt.hour
     data['day_of_week'] = data['date_hour'].dt.dayofweek
     return data
+
+class StatisticalTests:
+    def __init__(self, data: pd.DataFrame):
+        """Constructor for DataInspector
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Data to inspect
+
+        Raises
+        ------
+        ValueError
+            If data is not a pandas DataFrame
+        """
+        
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("data must be a pandas DataFrame")
+        
+        self.data = data
+        
+    def stationary_test(self, col_name: str, alpha: float = 0.05):
+        """Perform the Augmented Dickey-Fuller test
+
+        Parameters
+        ----------
+        col_name : str
+            Name of the column to test
+        alpha : float, optional
+            Significance level, by default 0.05
+
+        Raises
+        ------
+        ValueError
+            If col_name is not a string
+        ValueError
+            If alpha is not a float
+        KeyError
+            If col_name is not in the dataset
+        """
+        
+        if not isinstance(col_name, str):
+            raise ValueError("col_name must be a string")
+        
+        if not isinstance(alpha, float):
+            raise ValueError("alpha must be a float")
+        
+        if col_name not in self.data.columns:
+            raise KeyError(f"{col_name} is not a column in the dataset")
+        
+        result = adfuller(self.data[col_name])
+        print(f'ADF Statistic: {result[0]}')
+        print(f'p-value: {result[1]}')
+        print(f'Critical Values: {result[4]}')
+        
+        if result[1] < alpha:
+            print("Reject the null hypothesis, the data is stationary")
+        else:
+            print("Fail to reject the null hypothesis, the data is non-stationary")
+            
+    def fourier_analysis(self, col_name: str, height: int = 20):
+        """Perform Fourier analysis on the data
+
+        Parameters
+        ----------
+        col_name : str
+            Name of the column to analyze
+        height : int, optional
+            Minimum height for peaks, by default 20
+
+        Raises
+        ------
+        ValueError
+            If col_name is not a string
+        ValueError
+            If height is not an integer
+        KeyError
+            If col_name is not in the dataset
+        """
+        
+        if not isinstance(col_name, str):
+            raise ValueError("col_name must be a string")
+        
+        if not isinstance(height, int):
+            raise ValueError("n must be an integer")
+        
+        if col_name not in self.data.columns:
+            raise KeyError(f"{col_name} is not a column in the dataset")
+        
+        N = len(self.data[col_name])
+        
+        data = self.data[col_name].values
+        fft_values = fft(data)
+        
+        magnitude = 2.0/N * np.abs(fft_values[:N//2])
+        
+        peaks, _ = find_peaks(magnitude, height=height)
+        
+        print(f'Peaks found at: {peaks}\nWith amplitude: {magnitude[peaks]}')
+        
+        plt.plot(magnitude)
+        plt.xlabel('Frequency (1/N)')
+        plt.ylabel('Amplitude')
+        plt.title('Fourier Transform')
+        
+        plt.ylim(0, 90)
+        
+        plt.plot(peaks, magnitude[peaks], "x", markersize=10, color='red')
+        
+        plt.tight_layout()
+        plt.savefig('Figures/fourier_transform.png')
+        plt.show()
