@@ -424,8 +424,8 @@ class StatisticalTests:
         plt.tight_layout()
         plt.savefig('Figures/fourier_transform.png')
         plt.show()
-
-class TimeSeriesModel:
+            
+class Modelling:
     def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, test_size=None, models=None):
         """Constructor for TimeSeriesModel
         
@@ -437,8 +437,8 @@ class TimeSeriesModel:
             Testing data
         test_size : int, optional
             Size of the test set, by default len(test_data)
-        models : dict, optional
-            Dictionary of models to use, by default {'dt': (DecisionTreeRegressor(), {})}
+        models : dict
+            Dictionary of models to use
         
         Raises
         ------
@@ -449,12 +449,19 @@ class TimeSeriesModel:
         if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
             raise ValueError("train_data and test_data must be pandas DataFrames")
         
+        if models is None:
+            raise ValueError("no models provided")
+        
+        if models is not None:
+            if not isinstance(models, dict):
+                raise ValueError("models must be a dictionary")
+        
         self.train_data = train_data
         self.test_data = test_data
         self.test_size = test_size if test_size is not None else len(test_data)
-        self.models = models if models is not None else {'dt': (DecisionTreeRegressor(), {})}
+        self.models = models
 
-    def time_series_data(self, order: int):
+    def det_proc(self, order: int):
         """Generate time series data for training and testing
         
         Parameters
@@ -484,16 +491,43 @@ class TimeSeriesModel:
         self.new_train_data = train
         self.new_test_data = test
         return train, test
+    
+    def x_y_split(self, target: str):
+        """Split the data into X and y
+        
+        Parameters
+        ----------
+        target : str
+            Name of the target column
+            
+        Returns
+        -------
+        tuple
+            X and y dataframes
+            
+        Raises
+        ------
+        ValueError
+            If target is not a string
+        KeyError
+            If target is not in the dataset
+        """
+        
+        if not isinstance(target, str):
+            raise ValueError("target must be a string")
+        
+        if target not in self.train_data.columns:
+            raise KeyError(f"{target} is not a column in the dataset")
+        
+        self.X_train = self.new_train_data.drop(target, axis=1)
+        self.y_train = self.new_train_data[target]
+        return self.X_train, self.y_train
 
-    def grid_search(self, X_train: pd.DataFrame, y_train: pd.Series, n_splits: int = None, scoring: str = 'neg_root_mean_squared_error'):
+    def grid_search(self, n_splits: int = None, scoring: str = 'neg_root_mean_squared_error'):
         """Perform grid search on the models
         
         Parameters
         ----------
-        X_train : pd.DataFrame
-            Training data
-        y_train : pd.Series
-            Target data
         n_splits : int, optional
             Number of splits for cross-validation, by default len(self.train_data) - len(self.test_data)
         scoring : str, optional
@@ -502,20 +536,10 @@ class TimeSeriesModel:
         Raises
         ------
         ValueError
-            If X_train is not a pandas DataFrame
-        ValueError
-            If y_train is not a pandas Series
-        ValueError
             If n_splits is not an integer
         ValueError
             If scoring is not a string
         """
-        
-        if not isinstance(X_train, pd.DataFrame):
-            raise ValueError("X_train must be a pandas DataFrame")
-        
-        if not isinstance(y_train, pd.core.series.Series):
-            raise ValueError("y_train must be a pandas Series")
         
         if n_splits is not None and not isinstance(n_splits, int):
             raise ValueError("n_splits must be an integer")
@@ -533,71 +557,52 @@ class TimeSeriesModel:
         
         for model_name, model in self.models.items():
             grid = GridSearchCV(model[0], param_grid=model[1], cv=kf, scoring=scoring)
-            grid.fit(X_train, y_train)
+            grid.fit(self.X_train, self.y_train)
             print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
             self.best_params[model_name] = (grid.best_params_, grid.best_score_)
             
             if hasattr(grid.best_estimator_, 'feature_importances_'):
                 self.feature_importances[model_name] = grid.best_estimator_.feature_importances_
                 
-    def fit_predict(self, X_train: pd.DataFrame, y_train: pd.Series, X_test: pd.DataFrame):
+    def fit_predict(self):
         """Fit the models and make predictions
-        
-        Parameters
-        ----------
-        X_train : pd.DataFrame
-            Training data
-        y_train : pd.Series
-            Target data
-        X_test : pd.DataFrame
-            Testing data
-            
-        Raises
-        ------
-        ValueError
-            If X_train is not a pandas DataFrame
-        ValueError
-            If y_train is not a pandas Series
-        ValueError
-            If X_test is not a pandas DataFrame
         """
-        
-        if not isinstance(X_train, pd.DataFrame):
-            raise ValueError("X_train must be a pandas DataFrame")
-        
-        if not isinstance(y_train, pd.core.series.Series):
-            raise ValueError("y_train must be a pandas Series")
-        
-        if not isinstance(X_test, pd.DataFrame):
-            raise ValueError("X_test must be a pandas DataFrame")
         
         self.predictions = {}
         
         for model_name, model in self.models.items():
             model[0].set_params(**self.best_params[model_name][0])
-            model[0].fit(X_train, y_train)
-            self.predictions[model_name] = model[0].predict(X_test)
+            model[0].fit(self.X_train, self.y_train)
+            self.predictions[model_name] = model[0].predict(self.new_test_data)
         
-    def write_to_csv(self, pred_col: list):
+    def write_to_csv(self, pred_col: list, path_add: str = None):
         """Write predictions to a CSV file
         
         Parameters
         ----------
         pred_col : list
-            List of dates for the predictions
+            List of columns to use as predictions
+        path_add : str, optional
+            Addition to path to save the file, by default None
             
         Raises
         ------
         ValueError
             If pred_col is not a list
+        ValueError
+            If path is not a string
         """
         
         if not isinstance(pred_col, list):
             raise ValueError("pred_col must be a list")
         
+        if path_add is not None and not isinstance(path_add, str):
+            raise ValueError("path must be a string")
+                
         for model_name, preds in self.predictions.items():
             df = pd.DataFrame({'date_hour': pred_col, 'cnt': preds}, index=self.test_data.index)
-            df.to_csv(f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv')
+            path = f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+            df.to_csv(path, index=False)
     
     def plot_feature_importances(self):
         """Plot feature importances
