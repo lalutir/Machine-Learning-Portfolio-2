@@ -556,7 +556,7 @@ class Modelling:
         kf = TimeSeriesSplit(n_splits=n_splits)
         
         for model_name, model in self.models.items():
-            grid = GridSearchCV(model[0], param_grid=model[1], cv=kf, scoring=scoring)
+            grid = GridSearchCV(model[0], param_grid=model[1], cv=kf, scoring=scoring, n_jobs=-1)
             grid.fit(self.X_train, self.y_train)
             print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
             self.best_params[model_name] = (grid.best_params_, grid.best_score_)
