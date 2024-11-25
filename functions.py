@@ -404,13 +404,13 @@ class StatisticalTests:
         N = len(self.data[col_name])
         
         data = self.data[col_name].values
-        fft_values = fft(data)
+        self.fft_values = fft(data)
         
-        magnitude = 2.0/N * np.abs(fft_values[:N//2])
+        magnitude = 2.0/N * np.abs(self.fft_values[:N//2])
         
-        peaks, _ = find_peaks(magnitude, height=height)
+        self.peaks, _ = find_peaks(magnitude, height=height)
         
-        print(f'Peaks found at: {peaks}\nWith amplitude: {magnitude[peaks]}')
+        print(f'Peaks found at: {self.peaks}\nWith amplitude: {magnitude[self.peaks]}')
         
         plt.plot(magnitude)
         plt.xlabel('Frequency (1/N)')
@@ -419,10 +419,43 @@ class StatisticalTests:
         
         plt.ylim(0, 90)
         
-        plt.plot(peaks, magnitude[peaks], "x", markersize=10, color='red')
+        plt.plot(self.peaks, magnitude[self.peaks], "x", markersize=10, color='red')
         
         plt.tight_layout()
         plt.savefig('Figures/fourier_transform.png')
+        plt.show()
+        
+    def inverted_fourier_transform(self, col_name: str):
+        """Perform inverted Fourier transform on the data
+        
+        Parameters
+        ----------
+        col_name : str
+            Name of the column to analyze
+            
+        Raises
+        ------
+        ValueError
+            If col_name is not a string
+        KeyError
+            If col_name is not in the dataset
+        """
+        
+        if not isinstance(col_name, str):
+            raise ValueError("col_name must be a string")
+        
+        if col_name not in self.data.columns:
+            raise KeyError(f"{col_name} is not a column in the dataset")
+        
+        self.fft_values[self.peaks] = 0
+        
+        ifft_values = ifft(self.fft_values)
+        
+        plt.plot(ifft_values)
+        plt.title('Inverted Fourier Transform')
+        
+        plt.tight_layout()
+        plt.savefig('Figures/inverted_fourier_transform.png')
         plt.show()
             
 class Modelling:
