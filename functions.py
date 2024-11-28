@@ -9,8 +9,11 @@ from scipy.signal import find_peaks
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+from sklearn.metrics import mean_squared_error
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.model_selection import ParameterGrid
+from tqdm import tqdm
 
 class DataVisualizer:
     """ Class to visualize data
@@ -632,3 +635,121 @@ class CustomTimeSeriesSplit(TimeSeriesSplit):
         for test_start in test_starts:
             yield (indices[:test_start-self.test_size], indices[test_start:test_start+self.test_size])
             
+class SARIMAXModel:
+    def __init__(self, data: pd.DataFrame, param_grid: dict, trend='n'):
+        """
+        Constructor for SARIMAXModel.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            Data to fit the model.
+        param_grid : dict
+            Dictionary of SARIMAX parameters to search.
+        trend : str, optional
+            Type of trend to use, by default 'n'.
+            
+        Raises
+        ------
+        ValueError
+            If data is not a pandas DataFrame.
+        ValueError
+            If param_grid is not a dictionary.
+        """
+        
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError("data must be a pandas DataFrame")
+        
+        if not isinstance(param_grid, dict):
+            raise ValueError("param_grid must be a dictionary")
+        
+        self.data = data
+        self.param_grid = param_grid
+        self.trend = trend
+        self.best_score = float('inf')
+        self.best_params = None
+        self.best_model = None
+    
+    def grid_search(self):
+        """
+        Perform grid search to find the best SARIMAX parameters.
+        """
+        
+        grid = ParameterGrid(self.param_grid)
+
+        for params in tqdm(grid, desc="GridSearch iterations"):
+            try:
+                model = SARIMAX(self.data, order=params['order'], seasonal_order=params['seasonal_order'], trend=self.trend)
+                model_fit = model.fit(disp=False)
+
+                predictions = model_fit.fittedvalues
+                rmse = np.sqrt(mean_squared_error(self.data, predictions))
+
+                if rmse < self.best_score:
+                    self.best_score = rmse
+                    self.best_params = params
+                    self.best_model = model_fit
+            except Exception as e:
+                print(f'Error with {params}: {e}')
+
+        print(f'Best params: {self.best_params}')
+        print(f'Best score: {self.best_score}')
+        
+    def fit_final_model(self):
+        """
+        Fit the final SARIMAX model with the best found parameters.
+        """
+        if self.best_params is None:
+            print("No best parameters found. Run grid search first.")
+            return None
+
+        final_model = SARIMAX(self.data, order=self.best_params['order'], seasonal_order=self.best_params['seasonal_order'], trend=self.trend)
+        final_model_fit = final_model.fit(disp=False)
+        self.best_model = final_model_fit
+
+        return final_model_fit
+    
+    def predict(self, start_date: pd.Timestamp, end_date: pd.Timestamp, test_data_pred_col: list):
+        """
+        Predict on the test data.
+        
+        Parameters
+        ----------
+        start_date : pd.Timestamp
+            Start date of the test data.
+        end_date : pd.Timestamp
+            End date of the test data.
+        test_data_pred_col : list
+            List of indeces to predict.
+        
+        Raises
+        ------
+        ValueError
+            If start_date is not a pandas Timestamp.
+        ValueError
+            If end_date is not a pandas Timestamp.
+        ValueError
+            If test_data_pred_col is not a list.
+        """
+        
+        if not isinstance(start_date, pd.Timestamp):
+            raise ValueError("start_date must be a pandas Timestamp")
+        
+        if not isinstance(end_date, pd.Timestamp):
+            raise ValueError("end_date must be a pandas Timestamp")
+        
+        if not isinstance(test_data_pred_col, list):
+            raise ValueError("test_data_pred_col must be a list")
+        
+        if self.best_model is None:
+            print("Model is not fitted yet.")
+            return None
+
+        final_pred = self.best_model.predict(start=start_date, end=end_date)
+        self.df_preds = pd.DataFrame({'date_hour': test_data_pred_col, 'cnt': final_pred}, index=test_data_pred_col.index)
+
+    def save_predictions(self):
+        """
+        Save the predictions to a CSV file.
+        """
+        self.df_preds.to_csv(f'Predictions/SARIMAX_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False)
