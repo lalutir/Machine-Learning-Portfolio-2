@@ -9,15 +9,8 @@ from scipy.signal import find_peaks
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.linear_model import LinearRegression
-from sklearn.svm import SVR
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, BaggingRegressor
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from tqdm import tqdm
 
 class DataVisualizer:
@@ -459,9 +452,209 @@ class StatisticalTests:
         plt.savefig('Figures/inverted_fourier_transform.png')
         plt.show()
             
-class Modelling:
-    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, test_size=None, models=None):
-        """Constructor for TimeSeriesModel
+#class Modelling:
+#    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, test_size=None, models=None):
+#        """Constructor for TimeSeriesModel
+#        
+#        Parameters
+#        ----------
+#        train_data : pd.DataFrame
+#            Training data
+#        test_data : pd.DataFrame
+#            Testing data
+#        test_size : int, optional
+#            Size of the test set, by default len(test_data)
+#        models : dict
+#            Dictionary of models to use
+#        
+#        Raises
+#        ------
+#        ValueError
+#            If train_data or test_data is not a pandas DataFrame
+#        """
+#        
+#        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
+#            raise ValueError("train_data and test_data must be pandas DataFrames")
+#        
+#        if models is None:
+#            raise ValueError("no models provided")
+#        
+#        if models is not None:
+#            if not isinstance(models, dict):
+#                raise ValueError("models must be a dictionary")
+#        
+#        self.train_data = train_data
+#        self.test_data = test_data
+#        self.test_size = test_size if test_size is not None else len(test_data)
+#        self.models = models
+#
+#    def det_proc(self, order: int):
+#        """Generate time series data for training and testing
+#        
+#        Parameters
+#        ----------
+#        order : int
+#            Order of the deterministic process
+#        
+#        Returns
+#        -------
+#        tuple
+#            Train and test data with deterministic process applied
+#            
+#        Raises
+#        ------
+#        ValueError
+#            If order is not an integer
+#        """
+#        
+#        if not isinstance(order, int):
+#            raise ValueError("order must be an integer")
+#        
+#        dp = DeterministicProcess(index=self.train_data.index, constant=False, order=order, drop=True)
+#        train = dp.in_sample()
+#        test = dp.out_of_sample(forecast_index=self.test_data.index, steps=len(self.test_data))
+#        train = pd.concat([train, self.train_data], axis=1)
+#        test = pd.concat([test, self.test_data], axis=1)
+#        self.new_train_data = train
+#        self.new_test_data = test
+#        return train, test
+#    
+#    def x_y_split(self, target: str):
+#        """Split the data into X and y
+#        
+#        Parameters
+#        ----------
+#        target : str
+#            Name of the target column
+#            
+#        Returns
+#        -------
+#        tuple
+#            X and y dataframes
+#            
+#        Raises
+#        ------
+#        ValueError
+#            If target is not a string
+#        KeyError
+#            If target is not in the dataset
+#        """
+#        
+#        if not isinstance(target, str):
+#            raise ValueError("target must be a string")
+#        
+#        if target not in self.train_data.columns:
+#            raise KeyError(f"{target} is not a column in the dataset")
+#        
+#        self.X_train = self.new_train_data.drop(target, axis=1)
+#        self.y_train = self.new_train_data[target]
+#        return self.X_train, self.y_train
+#
+#    def grid_search(self, n_splits: int = None, scoring: str = 'neg_root_mean_squared_error'):
+#        """Perform grid search on the models
+#        
+#        Parameters
+#        ----------
+#        n_splits : int, optional
+#            Number of splits for cross-validation, by default len(self.train_data) - len(self.test_data)
+#        scoring : str, optional
+#            Scoring metric to use, by default 'neg_root_mean_squared_error'
+#            
+#        Raises
+#        ------
+#        ValueError
+#            If n_splits is not an integer
+#        ValueError
+#            If scoring is not a string
+#        """
+#        
+#        if n_splits is not None and not isinstance(n_splits, int):
+#            raise ValueError("n_splits must be an integer")
+#        
+#        if not isinstance(scoring, str):
+#            raise ValueError("scoring must be a string")
+#        
+#        if n_splits is None:
+#            n_splits = len(self.train_data) - len(self.test_data)
+#        
+#        self.best_params = {}
+#        self.feature_importances = {}
+#        self.predictions = {}
+#        
+#        kf = TimeSeriesSplit(n_splits=n_splits)
+#        
+#        for model_name, model in tqdm(self.models.items(), desc='Training Models'):
+#            if model[1] == {}:
+#                model[0].fit(self.X_train, self.y_train)
+#                self.predictions[model_name] = model[0].predict(self.new_test_data)
+#                
+#                print(f'{model_name} - No hyperparameters')
+#            else:
+#                grid = GridSearchCV(model[0], 
+#                                    param_grid=model[1], 
+#                                    cv=kf, 
+#                                    scoring=scoring, 
+#                                    n_jobs=-1)
+#
+#                grid.fit(self.X_train, self.y_train)
+#
+#                best_estimator = grid.best_estimator_
+#                self.best_params[model_name] = (grid.best_params_, grid.best_score_)
+#                self.predictions[model_name] = best_estimator.predict(self.new_test_data)
+#
+#                print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
+#        
+#    def write_to_csv(self, pred_col: list, path_add: str = None):
+#        """Write predictions to a CSV file
+#        
+#        Parameters
+#        ----------
+#        pred_col : list
+#            List of columns to use as predictions
+#        path_add : str, optional
+#            Addition to path to save the file, by default None
+#            
+#        Raises
+#        ------
+#        ValueError
+#            If pred_col is not a list
+#        ValueError
+#            If path is not a string
+#        """
+#        
+#        if not isinstance(pred_col, list):
+#            raise ValueError("pred_col must be a list")
+#        
+#        if path_add is not None and not isinstance(path_add, str):
+#            raise ValueError("path must be a string")
+#                
+#        for model_name, preds in self.predictions.items():
+#            df = pd.DataFrame({'date_hour': pred_col, 'cnt': preds}, index=self.test_data.index)
+#            path = f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else #f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+#            df.to_csv(path, index=False)
+#    
+#    def plot_feature_importances(self):
+#        """Plot feature importances
+#        
+#        Raises
+#        ------
+#        ValueError
+#            If feature_importances is not available
+#        """
+#        
+#        if not hasattr(self, 'feature_importances'):
+#            raise ValueError("Feature importances are not available")
+#        
+#        for model_name, importances in self.feature_importances.items():
+#            plt.figure(figsize=(10, 6))
+#            plt.barh(self.X_train.columns, importances)
+#            plt.title(f'Feature Importances for {model_name}')
+#            plt.savefig(f'Figures/feature_importances_{model_name}.png')
+#            plt.show()
+        
+class GridSearch:
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, model: object, param_grid: dict, n_splits: int = 5, split_size: int = None, scoring: str = 'neg_root_mean_squared_error'): 
+        """Constructor for GridSearch
         
         Parameters
         ----------
@@ -469,192 +662,160 @@ class Modelling:
             Training data
         test_data : pd.DataFrame
             Testing data
-        test_size : int, optional
-            Size of the test set, by default len(test_data)
-        models : dict
-            Dictionary of models to use
-        
-        Raises
-        ------
-        ValueError
-            If train_data or test_data is not a pandas DataFrame
-        """
-        
-        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
-            raise ValueError("train_data and test_data must be pandas DataFrames")
-        
-        if models is None:
-            raise ValueError("no models provided")
-        
-        if models is not None:
-            if not isinstance(models, dict):
-                raise ValueError("models must be a dictionary")
-        
-        self.train_data = train_data
-        self.test_data = test_data
-        self.test_size = test_size if test_size is not None else len(test_data)
-        self.models = models
-
-    def det_proc(self, order: int):
-        """Generate time series data for training and testing
-        
-        Parameters
-        ----------
-        order : int
-            Order of the deterministic process
-        
-        Returns
-        -------
-        tuple
-            Train and test data with deterministic process applied
-            
-        Raises
-        ------
-        ValueError
-            If order is not an integer
-        """
-        
-        if not isinstance(order, int):
-            raise ValueError("order must be an integer")
-        
-        dp = DeterministicProcess(index=self.train_data.index, constant=False, order=order, drop=True)
-        train = dp.in_sample()
-        test = dp.out_of_sample(forecast_index=self.test_data.index, steps=len(self.test_data))
-        train = pd.concat([train, self.train_data], axis=1)
-        test = pd.concat([test, self.test_data], axis=1)
-        self.new_train_data = train
-        self.new_test_data = test
-        return train, test
-    
-    def x_y_split(self, target: str):
-        """Split the data into X and y
-        
-        Parameters
-        ----------
         target : str
             Name of the target column
-            
-        Returns
-        -------
-        tuple
-            X and y dataframes
-            
-        Raises
-        ------
-        ValueError
-            If target is not a string
-        KeyError
-            If target is not in the dataset
-        """
-        
-        if not isinstance(target, str):
-            raise ValueError("target must be a string")
-        
-        if target not in self.train_data.columns:
-            raise KeyError(f"{target} is not a column in the dataset")
-        
-        self.X_train = self.new_train_data.drop(target, axis=1)
-        self.y_train = self.new_train_data[target]
-        return self.X_train, self.y_train
-
-    def grid_search(self, n_splits: int = None, scoring: str = 'neg_root_mean_squared_error'):
-        """Perform grid search on the models
-        
-        Parameters
-        ----------
+        model : object
+            Model to use
+        param_grid : dict
+            Dictionary of hyperparameters
         n_splits : int, optional
-            Number of splits for cross-validation, by default len(self.train_data) - len(self.test_data)
+            Number of splits, by default 5
+        split_size : int, optional
+            Size of the test set, by default len(test_data)
         scoring : str, optional
             Scoring metric to use, by default 'neg_root_mean_squared_error'
             
         Raises
         ------
         ValueError
+            If train_data or test_data is not a pandas DataFrame
+        ValueError
+            If target is not a string
+        ValueError
             If n_splits is not an integer
+        ValueError
+            If split_size is not an integer
         ValueError
             If scoring is not a string
         """
         
-        if n_splits is not None and not isinstance(n_splits, int):
+        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
+            raise ValueError("train_data and test_data must be pandas DataFrames")
+        
+        if not isinstance(target, str):
+            raise ValueError("target must be a string")
+        
+        if not isinstance(n_splits, int):
             raise ValueError("n_splits must be an integer")
+        
+        if split_size is not None and not isinstance(split_size, int):
+            raise ValueError("split_size must be an integer")
         
         if not isinstance(scoring, str):
             raise ValueError("scoring must be a string")
         
-        if n_splits is None:
-            n_splits = len(self.train_data) - len(self.test_data)
+        self.train_data = train_data
+        self.test_data = test_data
+        self.target = target
+        self.X_train = train_data.drop(target, axis=1)
+        self.y_train = train_data[target]
+        self.model = model
+        self.param_grid = param_grid
+        self.n_splits = n_splits
+        self.split_size = split_size if split_size is not None else len(test_data)
+        self.scoring = scoring
         
-        self.best_params = {}
-        self.feature_importances = {}
-        self.predictions = {}
+        self.tscv = CustomTimeSeriesSplit(n_splits=self.n_splits, test_size=self.split_size)
         
-        kf = TimeSeriesSplit(n_splits=n_splits)
+    def fit(self):
+        """Fit the model
         
-        for model_name, model in tqdm(self.models.items(), desc='Training Models'):
-            if model[1] == {}:
-                model[0].fit(self.X_train, self.y_train)
-                self.predictions[model_name] = model[0].predict(self.new_test_data)
-                
-                print(f'{model_name} - No hyperparameters')
-            else:
-                grid = GridSearchCV(model[0], 
-                                    param_grid=model[1], 
-                                    cv=kf, 
-                                    scoring=scoring, 
-                                    n_jobs=-1)
-
-                grid.fit(self.X_train, self.y_train)
-
-                best_estimator = grid.best_estimator_
-                self.best_params[model_name] = (grid.best_params_, grid.best_score_)
-                self.predictions[model_name] = best_estimator.predict(self.new_test_data)
-
-                print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
+        Returns
+        -------
+        tuple
+            Best hyperparameters and best score
+        """
         
-    def write_to_csv(self, pred_col: list, path_add: str = None):
+        grid = GridSearchCV(self.model, 
+                            param_grid=self.param_grid, 
+                            cv=self.tscv, 
+                            scoring=self.scoring, 
+                            n_jobs=-1)
+        
+        grid.fit(self.X_train, self.y_train)
+        
+        self.best_estimator = grid.best_estimator_
+        
+        return grid.best_params_, grid.best_score_
+    
+    def predict(self, to_pred_col: list):
+        """Predict on the test data
+        
+        Parameters
+        ----------
+        to_pred_col : list
+            List of indeces to predict
+            
+        Returns
+        -------
+        df_preds : pd.DataFrame
+            Dataframe with predictions
+        """
+        
+        self.predictions = self.best_estimator.predict(self.test_data)
+        
+        self.df_preds = pd.DataFrame({'date_hour': to_pred_col, 'cnt': self.predictions}, index=self.test_data.index)
+        return self.df_preds
+    
+    def to_csv(self, model: str, path_add: str = None):
         """Write predictions to a CSV file
         
         Parameters
         ----------
-        pred_col : list
-            List of columns to use as predictions
+        model : str
+            Name of the model
         path_add : str, optional
             Addition to path to save the file, by default None
             
         Raises
         ------
         ValueError
-            If pred_col is not a list
+            If model is not a string
         ValueError
             If path is not a string
         """
         
-        if not isinstance(pred_col, list):
-            raise ValueError("pred_col must be a list")
+        if not isinstance(model, str):
+            raise ValueError("model must be a string")
         
-        if path_add is not None and not isinstance(path_add, str):
+        if not isinstance(path_add, str) and path_add is not None:
             raise ValueError("path must be a string")
-                
-        for model_name, preds in self.predictions.items():
-            df = pd.DataFrame({'date_hour': pred_col, 'cnt': preds}, index=self.test_data.index)
-            path = f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
-            df.to_csv(path, index=False)
-    
-    def plot_feature_importances(self):
-        """Plot feature importances
         
-        Raises
+        path = f'Predictions/{model}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else f'Predictions/{model}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
+        
+        self.df_preds.to_csv(path, index=False)
+        
+class CustomTimeSeriesSplit(TimeSeriesSplit):
+    def __init__(self, n_splits, test_size):
+        super().__init__(n_splits=n_splits)
+        self.test_size = test_size
+        
+    def split(self, X, y=None, groups=None):
+        """Generate indices to split data into training and test set.
+        
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+            Training data, where n_samples is the number of samples and n_features is the number of features.
+        y : array-like, shape (n_samples,)
+            Always ignored, exists for compatibility.
+        groups : array-like, with shape (n_samples,), optional
+            Always ignored, exists for compatibility.
+        
+        Yields
         ------
-        ValueError
-            If feature_importances is not available
+        train : ndarray
+            The training set indices for that split.
+        test : ndarray
+            The testing set indices for that split.
         """
         
-        if not hasattr(self, 'feature_importances'):
-            raise ValueError("Feature importances are not available")
+        n_samples = X.shape[0]
+        n_splits = self.n_splits
+        n_folds = n_splits + 1
+        indices = np.arange(n_samples)
         
-        for model_name, importances in self.feature_importances.items():
-            plt.figure(figsize=(10, 6))
-            plt.barh(self.X_train.columns, importances)
-            plt.title(f'Feature Importances for {model_name}')
-            plt.savefig(f'Figures/feature_importances_{model_name}.png')
-            plt.show()
+        test_starts = range(n_samples - n_splits*self.test_size, n_samples, self.test_size)
+        
+        for test_start in test_starts:
+            yield (indices[:test_start-self.test_size], indices[test_start:test_start+self.test_size])
