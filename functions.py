@@ -36,7 +36,6 @@ class DataVisualizer:
         ValueError
             If data is not a pandas DataFrame
         """
-                
         if not isinstance(data, pd.DataFrame):
             raise ValueError("data must be a pandas DataFrame")
         
@@ -45,7 +44,6 @@ class DataVisualizer:
     def plot_missing_values(self):
         """Plot missing values in the dataset
         """
-        
         msno.matrix(self.data)
         plt.show()
         
@@ -66,7 +64,8 @@ class DataVisualizer:
         ValueError
             If df is not a string
         """ 
-        
+        display('abadsafasfasfasfa')
+
         if not isinstance(columns, list):
             raise ValueError("columns must be a list")
         
@@ -304,10 +303,12 @@ def create_timeseries_features(data: pd.DataFrame):
     if not isinstance(data, pd.core.frame.DataFrame):
         raise ValueError("data must be a pandas DataFrame")
         
+    
     data['date_hour'] = pd.to_datetime(data['date_hour'])
     data['year'] = data['date_hour'].dt.year
     data['month'] = data['date_hour'].dt.month
-    data['week'] = data['date_hour'].dt.week
+    if 'week' not in data.columns:
+        data['week'] = data['date_hour'].dt.isocalendar().week
     data['day'] = data['date_hour'].dt.day
     data['hour'] = data['date_hour'].dt.hour
     data['day_of_week'] = data['date_hour'].dt.dayofweek
