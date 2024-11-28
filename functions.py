@@ -11,7 +11,6 @@ from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
-from tqdm import tqdm
 
 class DataVisualizer:
     """ Class to visualize data
