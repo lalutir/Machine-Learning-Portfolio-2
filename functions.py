@@ -18,6 +18,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, AdaBoostRegressor, BaggingRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from tqdm import tqdm
 
 class DataVisualizer:
     """ Class to visualize data
@@ -368,18 +369,18 @@ class StatisticalTests:
         print(f'Critical Values: {result[4]}')
         
         if result[1] < alpha:
-            print("Reject the null hypothesis, the data is stationary")
+            print("\nReject the null hypothesis, the data is stationary")
         else:
-            print("Fail to reject the null hypothesis, the data is non-stationary")
+            print("\nFail to reject the null hypothesis, the data is non-stationary")
             
-    def fourier_analysis(self, col_name: str, height: int = 20):
+    def fourier_analysis(self, col_name: str, height: int | float = 50):
         """Perform Fourier analysis on the data
 
         Parameters
         ----------
         col_name : str
             Name of the column to analyze
-        height : int, optional
+        height : int or float, optional
             Minimum height for peaks, by default 20
 
         Raises
@@ -395,7 +396,7 @@ class StatisticalTests:
         if not isinstance(col_name, str):
             raise ValueError("col_name must be a string")
         
-        if not isinstance(height, int):
+        if not isinstance(height, int) and not isinstance(height, float):
             raise ValueError("n must be an integer")
         
         if col_name not in self.data.columns:
@@ -585,28 +586,30 @@ class Modelling:
         
         self.best_params = {}
         self.feature_importances = {}
+        self.predictions = {}
         
         kf = TimeSeriesSplit(n_splits=n_splits)
         
-        for model_name, model in self.models.items():
-            grid = GridSearchCV(model[0], param_grid=model[1], cv=kf, scoring=scoring, n_jobs=-1)
-            grid.fit(self.X_train, self.y_train)
-            print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
-            self.best_params[model_name] = (grid.best_params_, grid.best_score_)
-            
-            if hasattr(grid.best_estimator_, 'feature_importances_'):
-                self.feature_importances[model_name] = grid.best_estimator_.feature_importances_
+        for model_name, model in tqdm(self.models.items(), desc='Training Models'):
+            if model[1] == {}:
+                model[0].fit(self.X_train, self.y_train)
+                self.predictions[model_name] = model[0].predict(self.new_test_data)
                 
-    def fit_predict(self):
-        """Fit the models and make predictions
-        """
-        
-        self.predictions = {}
-        
-        for model_name, model in self.models.items():
-            model[0].set_params(**self.best_params[model_name][0])
-            model[0].fit(self.X_train, self.y_train)
-            self.predictions[model_name] = model[0].predict(self.new_test_data)
+                print(f'{model_name} - No hyperparameters')
+            else:
+                grid = GridSearchCV(model[0], 
+                                    param_grid=model[1], 
+                                    cv=kf, 
+                                    scoring=scoring, 
+                                    n_jobs=-1)
+
+                grid.fit(self.X_train, self.y_train)
+
+                best_estimator = grid.best_estimator_
+                self.best_params[model_name] = (grid.best_params_, grid.best_score_)
+                self.predictions[model_name] = best_estimator.predict(self.new_test_data)
+
+                print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
         
     def write_to_csv(self, pred_col: list, path_add: str = None):
         """Write predictions to a CSV file
