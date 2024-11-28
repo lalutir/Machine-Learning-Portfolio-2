@@ -451,209 +451,9 @@ class StatisticalTests:
         plt.tight_layout()
         plt.savefig('Figures/inverted_fourier_transform.png')
         plt.show()
-            
-#class Modelling:
-#    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, test_size=None, models=None):
-#        """Constructor for TimeSeriesModel
-#        
-#        Parameters
-#        ----------
-#        train_data : pd.DataFrame
-#            Training data
-#        test_data : pd.DataFrame
-#            Testing data
-#        test_size : int, optional
-#            Size of the test set, by default len(test_data)
-#        models : dict
-#            Dictionary of models to use
-#        
-#        Raises
-#        ------
-#        ValueError
-#            If train_data or test_data is not a pandas DataFrame
-#        """
-#        
-#        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
-#            raise ValueError("train_data and test_data must be pandas DataFrames")
-#        
-#        if models is None:
-#            raise ValueError("no models provided")
-#        
-#        if models is not None:
-#            if not isinstance(models, dict):
-#                raise ValueError("models must be a dictionary")
-#        
-#        self.train_data = train_data
-#        self.test_data = test_data
-#        self.test_size = test_size if test_size is not None else len(test_data)
-#        self.models = models
-#
-#    def det_proc(self, order: int):
-#        """Generate time series data for training and testing
-#        
-#        Parameters
-#        ----------
-#        order : int
-#            Order of the deterministic process
-#        
-#        Returns
-#        -------
-#        tuple
-#            Train and test data with deterministic process applied
-#            
-#        Raises
-#        ------
-#        ValueError
-#            If order is not an integer
-#        """
-#        
-#        if not isinstance(order, int):
-#            raise ValueError("order must be an integer")
-#        
-#        dp = DeterministicProcess(index=self.train_data.index, constant=False, order=order, drop=True)
-#        train = dp.in_sample()
-#        test = dp.out_of_sample(forecast_index=self.test_data.index, steps=len(self.test_data))
-#        train = pd.concat([train, self.train_data], axis=1)
-#        test = pd.concat([test, self.test_data], axis=1)
-#        self.new_train_data = train
-#        self.new_test_data = test
-#        return train, test
-#    
-#    def x_y_split(self, target: str):
-#        """Split the data into X and y
-#        
-#        Parameters
-#        ----------
-#        target : str
-#            Name of the target column
-#            
-#        Returns
-#        -------
-#        tuple
-#            X and y dataframes
-#            
-#        Raises
-#        ------
-#        ValueError
-#            If target is not a string
-#        KeyError
-#            If target is not in the dataset
-#        """
-#        
-#        if not isinstance(target, str):
-#            raise ValueError("target must be a string")
-#        
-#        if target not in self.train_data.columns:
-#            raise KeyError(f"{target} is not a column in the dataset")
-#        
-#        self.X_train = self.new_train_data.drop(target, axis=1)
-#        self.y_train = self.new_train_data[target]
-#        return self.X_train, self.y_train
-#
-#    def grid_search(self, n_splits: int = None, scoring: str = 'neg_root_mean_squared_error'):
-#        """Perform grid search on the models
-#        
-#        Parameters
-#        ----------
-#        n_splits : int, optional
-#            Number of splits for cross-validation, by default len(self.train_data) - len(self.test_data)
-#        scoring : str, optional
-#            Scoring metric to use, by default 'neg_root_mean_squared_error'
-#            
-#        Raises
-#        ------
-#        ValueError
-#            If n_splits is not an integer
-#        ValueError
-#            If scoring is not a string
-#        """
-#        
-#        if n_splits is not None and not isinstance(n_splits, int):
-#            raise ValueError("n_splits must be an integer")
-#        
-#        if not isinstance(scoring, str):
-#            raise ValueError("scoring must be a string")
-#        
-#        if n_splits is None:
-#            n_splits = len(self.train_data) - len(self.test_data)
-#        
-#        self.best_params = {}
-#        self.feature_importances = {}
-#        self.predictions = {}
-#        
-#        kf = TimeSeriesSplit(n_splits=n_splits)
-#        
-#        for model_name, model in tqdm(self.models.items(), desc='Training Models'):
-#            if model[1] == {}:
-#                model[0].fit(self.X_train, self.y_train)
-#                self.predictions[model_name] = model[0].predict(self.new_test_data)
-#                
-#                print(f'{model_name} - No hyperparameters')
-#            else:
-#                grid = GridSearchCV(model[0], 
-#                                    param_grid=model[1], 
-#                                    cv=kf, 
-#                                    scoring=scoring, 
-#                                    n_jobs=-1)
-#
-#                grid.fit(self.X_train, self.y_train)
-#
-#                best_estimator = grid.best_estimator_
-#                self.best_params[model_name] = (grid.best_params_, grid.best_score_)
-#                self.predictions[model_name] = best_estimator.predict(self.new_test_data)
-#
-#                print(f'{model_name} - Best Params: {grid.best_params_} - Best Score: {grid.best_score_}')
-#        
-#    def write_to_csv(self, pred_col: list, path_add: str = None):
-#        """Write predictions to a CSV file
-#        
-#        Parameters
-#        ----------
-#        pred_col : list
-#            List of columns to use as predictions
-#        path_add : str, optional
-#            Addition to path to save the file, by default None
-#            
-#        Raises
-#        ------
-#        ValueError
-#            If pred_col is not a list
-#        ValueError
-#            If path is not a string
-#        """
-#        
-#        if not isinstance(pred_col, list):
-#            raise ValueError("pred_col must be a list")
-#        
-#        if path_add is not None and not isinstance(path_add, str):
-#            raise ValueError("path must be a string")
-#                
-#        for model_name, preds in self.predictions.items():
-#            df = pd.DataFrame({'date_hour': pred_col, 'cnt': preds}, index=self.test_data.index)
-#            path = f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else #f'Predictions/{model_name}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
-#            df.to_csv(path, index=False)
-#    
-#    def plot_feature_importances(self):
-#        """Plot feature importances
-#        
-#        Raises
-#        ------
-#        ValueError
-#            If feature_importances is not available
-#        """
-#        
-#        if not hasattr(self, 'feature_importances'):
-#            raise ValueError("Feature importances are not available")
-#        
-#        for model_name, importances in self.feature_importances.items():
-#            plt.figure(figsize=(10, 6))
-#            plt.barh(self.X_train.columns, importances)
-#            plt.title(f'Feature Importances for {model_name}')
-#            plt.savefig(f'Figures/feature_importances_{model_name}.png')
-#            plt.show()
         
 class GridSearch:
-    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, model: object, param_grid: dict, n_splits: int = 5, split_size: int = None, scoring: str = 'neg_root_mean_squared_error'): 
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, model: object, param_grid: dict, n_splits: int = 5, split_size: int = None, scoring: str = 'neg_root_mean_squared_error', order: int = None): 
         """Constructor for GridSearch
         
         Parameters
@@ -674,6 +474,8 @@ class GridSearch:
             Size of the test set, by default len(test_data)
         scoring : str, optional
             Scoring metric to use, by default 'neg_root_mean_squared_error'
+        order : int, optional
+            Order of the time series, by default None
             
         Raises
         ------
@@ -704,6 +506,9 @@ class GridSearch:
         if not isinstance(scoring, str):
             raise ValueError("scoring must be a string")
         
+        if order is not None and not isinstance(order, int):
+            raise ValueError("order must be an integer")
+        
         self.train_data = train_data
         self.test_data = test_data
         self.target = target
@@ -714,6 +519,13 @@ class GridSearch:
         self.n_splits = n_splits
         self.split_size = split_size if split_size is not None else len(test_data)
         self.scoring = scoring
+        
+        if order is not None:
+            dp = DeterministicProcess(index=self.y_train.index, constant=False, order=order, drop=True)
+            self.X_train_con = dp.in_sample()
+            self.test_data_con = dp.out_of_sample(forecast_index=self.test_data.index, steps=len(self.test_data))
+            self.X_train = pd.concat([self.X_train, self.X_train_con], axis=1)
+            self.test_data = pd.concat([self.test_data, self.test_data_con], axis=1)
         
         self.tscv = CustomTimeSeriesSplit(n_splits=self.n_splits, test_size=self.split_size)
         
@@ -733,6 +545,7 @@ class GridSearch:
                             n_jobs=-1)
         
         grid.fit(self.X_train, self.y_train)
+        print(f'Best parameters: {grid.best_params_}, Best score: {grid.best_score_}')
         
         self.best_estimator = grid.best_estimator_
         
@@ -819,3 +632,4 @@ class CustomTimeSeriesSplit(TimeSeriesSplit):
         
         for test_start in test_starts:
             yield (indices[:test_start-self.test_size], indices[test_start:test_start+self.test_size])
+            
