@@ -15,3 +15,8 @@
 | 1 | xgb | {'colsample_bytree': 0.7, 'learning_rate': 0.3, 'max_depth': 5, 'n_estimators': 100, 'subsample': 1} | None | -131.72206119894074 | 108.51858 |
 | 1 | xgb | {'colsample_bytree': 1, 'learning_rate': 0.3, 'max_depth': 5, 'n_estimators': 100, 'subsample': 1} | 1 | -76.83551232499057 | 67.78968 |
 | 1 | xgb | {'colsample_bytree': 1, 'learning_rate': 0.3, 'max_depth': 5, 'n_estimators': 100, 'subsample': 1} | 2 | -76.83551232499057 | 67.78968 |
+| 2 | lr | {'copy_X': True, 'fit_intercept': False} | 1 | -192.8574671259826 | 153.27953 | 
+| 2 | knn | {'n_neighbors': 5, 'weights': 'distance'} | None | -157.82608561604465 | 138.12014 |
+| 2 | dt | {'max_depth': 5, 'min_samples_leaf': 2, 'min_samples_split': 2} | 1 | -147.06278955513227 | 127.13073 |
+| 2 | rf | {'max_depth': 5, 'min_samples_leaf': 4, 'min_samples_split': 6, 'n_estimators': 25} | 1 | -142.74319719931265 | 124.30066 |
+| 2 | xgb | {'colsample_bytree': 1, 'learning_rate': 0.3, 'max_depth': 5, 'n_estimators': 100, 'subsample': 1} | 1 | -76.83551232499057 | 67.78968 |
