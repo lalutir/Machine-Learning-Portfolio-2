@@ -386,6 +386,11 @@ class StatisticalTests:
             If height is not an integer
         KeyError
             If col_name is not in the dataset
+            
+        Returns
+        -------
+        df_fft : pd.DataFrame
+            Dataframe with Fourier analysis results
         """
         
         if not isinstance(col_name, str):
@@ -412,38 +417,163 @@ class StatisticalTests:
         plt.savefig('Figures/periodigram.png')
         plt.show()
         
-    def inverted_fourier_transform(self, col_name: str):
-        """Perform inverted Fourier transform on the data
+        df_fft = pd.DataFrame(np.abs(fft_result))
+        #df_fft['fft_result'] = fft_result
+        df_fft['freq'] = freq
+        df_fft['duur in uren'] = 1/freq
+        df_fft['duur in dagen'] = 1/freq/24
+        df_fft.rename(columns={0:'amplitude'}, inplace=True)
+        df_fft = df_fft[(df_fft['amplitude'] > 0.5e+06)&(df_fft['freq'] > 0)]
+        return df_fft
         
+class FeatureEngineering:
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, cols_to_drop: list = None, col_to_dummy: list = None, cols_to_fourier: list = None, index_col: str = None):
+        """Constructor for FeatureEngineering
+
         Parameters
         ----------
-        col_name : str
-            Name of the column to analyze
-            
+        train_data : pd.DataFrame
+            Training data
+        test_data : pd.DataFrame
+            Testing data
+        cols_to_drop : list, optional
+            Columns to drop, by default None
+        col_to_dummy : list, optional
+            Columns to create dummies for, by default None
+        cols_to_fourier : list, optional
+            Columns to perform Fourier analysis on, by default None
+        index_col : str, optional
+            Name of the index column, by default None
+
         Raises
         ------
         ValueError
-            If col_name is not a string
-        KeyError
-            If col_name is not in the dataset
+            If train_data or test_data is not a pandas DataFrame
+        ValueError
+            If cols_to_drop is not a list
+        ValueError
+            If col_to_dummy is not a list
+        ValueError
+            If cols_to_fourier is not a list
+        ValueError
+            If index_col is not a string
         """
         
-        if not isinstance(col_name, str):
-            raise ValueError("col_name must be a string")
+        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
+            raise ValueError("train_data and test_data must be pandas DataFrames")
         
-        if col_name not in self.data.columns:
-            raise KeyError(f"{col_name} is not a column in the dataset")
+        if cols_to_drop is not None and not isinstance(cols_to_drop, list):
+            raise ValueError("cols_to_drop must be a list")
         
-        self.fft_values[self.peaks] = 0
+        if col_to_dummy is not None and not isinstance(col_to_dummy, list):
+            raise ValueError("col_to_dummy must be a list")
         
-        ifft_values = ifft(self.fft_values)
+        if cols_to_fourier is not None and not isinstance(cols_to_fourier, list):
+            raise ValueError("cols_to_fourier must be a list")
         
-        plt.plot(ifft_values)
-        plt.title('Inverted Fourier Transform')
+        if index_col is not None and not isinstance(index_col, str):
+            raise ValueError("index_col must be a string")
         
-        plt.tight_layout()
-        plt.savefig('Figures/inverted_fourier_transform.png')
-        plt.show()
+        self.train_data = train_data
+        self.test_data = test_data
+        self.cols_to_drop = cols_to_drop
+        self.col_to_dummy = col_to_dummy
+        self.cols_to_fourier = cols_to_fourier
+        self.index_col = index_col
+        
+    def drop_columns(self):
+        """Drop columns from the dataset
+        """
+        
+        if self.cols_to_drop is not None:
+            print(f"Dropping columns: {self.cols_to_drop}")
+            self.train_data.info()
+            self.test_data.info()
+            
+            self.train_data.drop(self.cols_to_drop, axis=1, inplace=True)
+            self.test_data.drop(self.cols_to_drop, axis=1, inplace=True)
+            
+            print("Columns dropped")
+            self.train_data.info()
+            self.test_data.info()
+            
+    def create_dummies(self):
+        """Create dummy variables for the columns
+        """
+        
+        if self.col_to_dummy is not None:
+            print(f"Creating dummies for columns: {self.col_to_dummy}")
+            self.train_data.info()
+            self.test_data.info()
+            
+            self.train_data = pd.get_dummies(self.train_data, columns=self.col_to_dummy)
+            self.test_data = pd.get_dummies(self.test_data, columns=self.col_to_dummy)
+            
+            print("Dummies created")
+            self.train_data.info()
+            self.test_data.info()
+            
+    def fourier_wave(self, period: int = None):
+        """Create Fourier waves for the columns
+
+        Parameters
+        ----------
+        period : int, optional
+            Period for the Fourier wave, by default 24 for hour and 52 for week
+        """
+        
+        if self.cols_to_fourier is not None:
+            print(f"Creating Fourier waves for columns: {self.cols_to_fourier}")
+            self.train_data.info()
+            self.test_data.info()
+            
+            for col in self.cols_to_fourier:
+                if col == 'hour':
+                    period = 24
+                elif col == 'week':
+                    period = 52
+                    self.train_data[col] = (self.train_data[col] - 1) % 52
+                    self.test_data[col] = (self.test_data[col] - 1) % 52
+                self.train_data[col + '_sin'] = np.sin(2 * np.pi * self.train_data[col] / period)
+                self.train_data[col + '_cos'] = np.cos(2 * np.pi * self.train_data[col] / period)
+                self.test_data[col + '_sin'] = np.sin(2 * np.pi * self.test_data[col] / period)
+                self.test_data[col + '_cos'] = np.cos(2 * np.pi * self.test_data[col] / period)
+                
+                plt.plot(self.train_data[col + '_sin'], label='sin')
+                plt.plot(self.train_data[col + '_cos'], label='cos')
+                plt.title(f'Fourier waves for {col}')
+                plt.legend()
+                plt.xlabel('hours')
+                if col == 'hour':
+                    plt.xlim(0, 24)
+                elif col == 'week':
+                    plt.xlim(0, 52*7*24)
+                plt.savefig(f'Figures/fourier_{col}.png')
+                plt.show()
+                
+                self.train_data.drop(col, axis=1, inplace=True)
+                self.test_data.drop(col, axis=1, inplace=True)
+                
+            print("Fourier waves created")
+            self.train_data.info()
+            self.test_data.info()
+        
+    def set_index(self):
+        """Set the index for the dataset
+        
+        Returns
+        -------
+        train_data : pd.DataFrame
+            Training data
+        test_data : pd.DataFrame
+            Testing data
+        """
+        
+        if self.index_col is not None:
+            self.train_data.set_index(self.index_col, inplace=True)
+            self.test_data.set_index(self.index_col, inplace=True)
+            
+        return self.train_data, self.test_data
         
 class GridSearch:
     def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, model: object, param_grid: dict, n_splits: int = 5, split_size: int = None, scoring: str = 'neg_root_mean_squared_error', order: int = None): 
