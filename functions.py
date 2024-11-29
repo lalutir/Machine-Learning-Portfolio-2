@@ -636,13 +636,13 @@ class CustomTimeSeriesSplit(TimeSeriesSplit):
             yield (indices[:test_start-self.test_size], indices[test_start:test_start+self.test_size])
             
 class SARIMAXModel:
-    def __init__(self, data: pd.DataFrame, param_grid: dict, trend='n'):
+    def __init__(self, data: pd.Series, param_grid: dict, trend='n'):
         """
         Constructor for SARIMAXModel.
         
         Parameters
         ----------
-        data : pd.DataFrame
+        data : pd.Series
             Data to fit the model.
         param_grid : dict
             Dictionary of SARIMAX parameters to search.
@@ -652,13 +652,13 @@ class SARIMAXModel:
         Raises
         ------
         ValueError
-            If data is not a pandas DataFrame.
+            If data is not a pandas Series.
         ValueError
             If param_grid is not a dictionary.
         """
         
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError("data must be a pandas DataFrame")
+        if not isinstance(data, pd.Series):
+            raise ValueError("data must be a pandas Series")
         
         if not isinstance(param_grid, dict):
             raise ValueError("param_grid must be a dictionary")
