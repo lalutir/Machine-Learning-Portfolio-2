@@ -397,28 +397,19 @@ class StatisticalTests:
         if col_name not in self.data.columns:
             raise KeyError(f"{col_name} is not a column in the dataset")
         
-        N = len(self.data[col_name])
-        
-        data = self.data[col_name].values
-        self.fft_values = fft(data)
-        
-        magnitude = 2.0/N * np.abs(self.fft_values[:N//2])
-        
-        self.peaks, _ = find_peaks(magnitude, height=height)
-        
-        print(f'Peaks found at: {self.peaks}\nWith amplitude: {magnitude[self.peaks]}')
-        
-        plt.plot(magnitude)
-        plt.xlabel('Frequency (1/N)')
+        timeseries = self.data[col_name].values.ravel()
+        n = len(timeseries)
+        freq = np.fft.fftfreq(n,1)
+        fft_result = fft(timeseries)
+
+        plt.figure(figsize=(10, 6))
+        plt.plot(freq, np.abs(fft_result))
+        plt.xlabel('Frequency (1/hour)')
         plt.ylabel('Amplitude')
-        plt.title('Fourier Transform')
-        
-        plt.ylim(0, 90)
-        
-        plt.plot(self.peaks, magnitude[self.peaks], "x", markersize=10, color='red')
-        
-        plt.tight_layout()
-        plt.savefig('Figures/fourier_transform.png')
+        plt.xlim([0,0.05])
+        plt.title('Periodigram')
+        plt.grid(True)
+        plt.savefig('Figures/periodigram.png')
         plt.show()
         
     def inverted_fourier_transform(self, col_name: str):
