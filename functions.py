@@ -757,14 +757,16 @@ class CustomTimeSeriesSplit(TimeSeriesSplit):
             yield (indices[:test_start-self.test_size], indices[test_start:test_start+self.test_size])
             
 class SARIMAXModel:
-    def __init__(self, data: pd.Series, param_grid: dict, trend='n'):
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, param_grid: dict, trend='n'):
         """
         Constructor for SARIMAXModel.
         
         Parameters
         ----------
-        data : pd.Series
-            Data to fit the model.
+        train_data : pd.DataFrame
+            Train data to fit the model.
+        test_data : pd.DataFrame
+            Test data to predict.
         param_grid : dict
             Dictionary of SARIMAX parameters to search.
         trend : str, optional
@@ -773,18 +775,27 @@ class SARIMAXModel:
         Raises
         ------
         ValueError
-            If data is not a pandas Series.
+            If train_data is not a pandas DataFrame.
+        ValueError
+            If test_data is not a pandas DataFrame.
         ValueError
             If param_grid is not a dictionary.
         """
         
-        if not isinstance(data, pd.Series):
-            raise ValueError("data must be a pandas Series")
+        if not isinstance(train_data, pd.DataFrame):
+            raise ValueError("train_data must be a pandas DataFrame")
+        
+        if not isinstance(test_data, pd.DataFrame):
+            raise ValueError("test_data must be a pandas DataFrame")
         
         if not isinstance(param_grid, dict):
             raise ValueError("param_grid must be a dictionary")
         
-        self.data = data
+        self.train_data = train_data
+        self.train_target = train_data['cnt']
+        self.train_exog = train_data.drop('cnt', axis=1)
+        self.test_data = test_data
+        self.test_exog = test_data
         self.param_grid = param_grid
         self.trend = trend
         self.best_score = float('inf')
@@ -800,11 +811,11 @@ class SARIMAXModel:
 
         for params in tqdm(grid, desc="GridSearch iterations"):
             try:
-                model = SARIMAX(self.data, order=params['order'], seasonal_order=params['seasonal_order'], trend=self.trend)
+                model = SARIMAX(self.train_target, exog=self.train_exog, order=params['order'], seasonal_order=params['seasonal_order'], trend=self.trend)
                 model_fit = model.fit(disp=False)
 
                 predictions = model_fit.fittedvalues
-                rmse = np.sqrt(mean_squared_error(self.data, predictions))
+                rmse = np.sqrt(mean_squared_error(self.train_target, predictions))
 
                 if rmse < self.best_score:
                     self.best_score = rmse
@@ -815,59 +826,32 @@ class SARIMAXModel:
 
         print(f'Best params: {self.best_params}')
         print(f'Best score: {self.best_score}')
-        
-    def fit_final_model(self):
-        """
-        Fit the final SARIMAX model with the best found parameters.
-        """
-        if self.best_params is None:
-            print("No best parameters found. Run grid search first.")
-            return None
-
-        final_model = SARIMAX(self.data, order=self.best_params['order'], seasonal_order=self.best_params['seasonal_order'], trend=self.trend)
-        final_model_fit = final_model.fit(disp=False)
-        self.best_model = final_model_fit
-
-        return final_model_fit
     
-    def predict(self, start_date: str, end_date: str, test_data_pred_col: list):
+    def predict(self, test_data_pred_col: list):
         """
         Predict on the test data.
-        
+
         Parameters
         ----------
-        start_date : str
-            Start date of the test data.
-        end_date : str
-            End date of the test data.
         test_data_pred_col : list
-            List of indeces to predict.
-        
+            List of timestamps to predict.
+
         Raises
         ------
         ValueError
-            If start_date is not a str.
-        ValueError
-            If end_date is not a str.
-        ValueError
             If test_data_pred_col is not a list.
         """
-        
-        if not isinstance(start_date, str):
-            raise ValueError("start_date must be a str")
-        
-        if not isinstance(end_date, str):
-            raise ValueError("end_date must be a str")
-        
         if not isinstance(test_data_pred_col, list):
             raise ValueError("test_data_pred_col must be a list")
-        
+
         if self.best_model is None:
             print("Model is not fitted yet.")
             return None
-
-        final_pred = self.best_model.predict(start=start_date, end=end_date)
-        self.df_preds = pd.DataFrame({'date_hour': test_data_pred_col, 'cnt': final_pred}, index=test_data_pred_col.index)
+        
+        forecast = self.best_model.get_forecast(steps=len(self.test_data), exog=self.test_exog)
+        predictions = forecast.predicted_mean
+    
+        self.df_preds = pd.DataFrame({'date_hour': test_data_pred_col, 'cnt': predictions})
 
     def save_predictions(self):
         """
