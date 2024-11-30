@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import missingno as msno
 import datetime as dt
-from scipy.fft import fft, ifft
-from scipy.signal import find_peaks
+from scipy.fft import fft
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
@@ -14,6 +13,7 @@ from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.model_selection import ParameterGrid
 from tqdm import tqdm
+from prophet import Prophet
 
 class DataVisualizer:
     """ Class to visualize data
@@ -874,3 +874,159 @@ class SARIMAXModel:
         Save the predictions to a CSV file.
         """
         self.df_preds.to_csv(f'Predictions/SARIMAX_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False)
+        
+class ProphetModel:
+    def __init__(self, train_data: pd.DataFrame, param_grid: dict, target_col='cnt'):
+        """
+        Constructor for ProphetModel with support for multiple regressors.
+
+        Parameters
+        ----------
+        train_data : pd.DataFrame
+            Training data with the columns: ['temp', 'hum', 'cnt', 'weathersit_1', 'weathersit_2', 
+            'weathersit_3', 'hour_sin', 'hour_cos', 'week_sin', 'week_cos', 'date_hour'].
+        param_grid : dict
+            Dictionary of Prophet parameters to search.
+        target_col : str, optional
+            The target column for predictions (default is 'cnt').
+            
+        Raises
+        ------
+        ValueError
+            If train_data is not a pandas DataFrame.
+        ValueError
+            If param_grid is not a dictionary.
+        """
+        
+        if not isinstance(train_data, pd.DataFrame):
+            raise ValueError("train_data must be a pandas DataFrame")
+        
+        if not isinstance(param_grid, dict):
+            raise ValueError("param_grid must be a dictionary")
+        
+        self.train_data = train_data
+        self.target_col = target_col
+        self.param_grid = param_grid
+        self.best_score = float('inf')
+        self.best_params = None
+        self.best_model = None
+    
+    def grid_search(self):
+        """
+        Perform grid search to find the best Prophet parameters.
+        """
+        
+        grid = ParameterGrid(self.param_grid)
+
+        for params in tqdm(grid, desc="GridSearch iterations"):
+            try:
+                train_data_prophet = self.train_data[['temp', 'hum', 'weathersit_1', 'weathersit_2', 
+                                                      'weathersit_3', 'hour_sin', 'hour_cos', 'week_sin', 'week_cos']]
+                train_data_prophet['ds'] = self.train_data.index
+                train_data_prophet['y'] = self.train_data[self.target_col]
+
+                model = Prophet(
+                    seasonality_mode=params.get('seasonality_mode', 'additive'),
+                    yearly_seasonality=params.get('yearly_seasonality', 'auto'),
+                    weekly_seasonality=params.get('weekly_seasonality', 'auto'),
+                    daily_seasonality=params.get('daily_seasonality', 'auto'),
+                    changepoint_prior_scale=params.get('changepoint_prior_scale', 0.05)
+                )
+
+                for col in train_data_prophet.columns:
+                    if col not in ['ds', 'y']:
+                        model.add_regressor(col)
+                
+                model.fit(train_data_prophet)
+
+                future = model.make_future_dataframe(train_data_prophet)
+                forecast = model.predict(future)
+
+                rmse = np.sqrt(mean_squared_error(train_data_prophet['y'], forecast['yhat']))
+
+                if rmse < self.best_score:
+                    self.best_score = rmse
+                    self.best_params = params
+                    self.best_model = model
+            except Exception as e:
+                print(f'Error with {params}: {e}')
+
+        print(f'Best params: {self.best_params}')
+        print(f'Best score: {self.best_score}')
+        
+    def fit_final_model(self):
+        """
+        Fit the final Prophet model with the best found parameters.
+        """
+        if self.best_params is None:
+            print("No best parameters found. Run grid search first.")
+            return None
+
+        train_data_prophet = self.train_data[['temp', 'hum', 'weathersit_1', 'weathersit_2', 
+                                              'weathersit_3', 'hour_sin', 'hour_cos', 'week_sin', 'week_cos']]
+        train_data_prophet['ds'] = self.train_data.index
+        train_data_prophet['y'] = self.train_data[self.target_col]
+
+        final_model = Prophet(
+            seasonality_mode=self.best_params.get('seasonality_mode', 'additive'),
+            yearly_seasonality=self.best_params.get('yearly_seasonality', 'auto'),
+            weekly_seasonality=self.best_params.get('weekly_seasonality', 'auto'),
+            daily_seasonality=self.best_params.get('daily_seasonality', 'auto'),
+            changepoint_prior_scale=self.best_params.get('changepoint_prior_scale', 0.05)
+        )
+
+        for col in train_data_prophet.columns:
+            if col not in ['ds', 'y']:
+                final_model.add_regressor(col)
+
+        final_model.fit(train_data_prophet)
+        self.best_model = final_model
+        
+        self.train_data_prophet = train_data_prophet
+
+        return final_model
+    
+    def predict(self, test_data: pd.DataFrame, periods: int, freq: str = 'H'):
+        """
+        Predict on future data.
+
+        Parameters
+        ----------
+        test_data : pd.DataFrame
+            Test data without the target column ('cnt').
+        periods : int
+            The number of periods to forecast.
+        freq : str, optional
+            Frequency of the forecast (default is 'H' for hourly), can be 'D' for daily, etc.
+        """
+
+        if self.best_model is None:
+            print("Model is not fitted yet.")
+            return None
+
+        if not isinstance(self.train_data.index, pd.DatetimeIndex):
+            self.train_data.index = pd.to_datetime(self.train_data.index)
+        
+        test_data_prophet = test_data[['temp', 'hum', 'weathersit_1', 'weathersit_2', 
+                                       'weathersit_3', 'hour_sin', 'hour_cos', 'week_sin', 'week_cos']]
+        test_data_prophet['ds'] = test_data.index
+
+        future = self.best_model.make_future_dataframe(self.train_data_prophet, periods=periods, freq=freq)
+
+        for col in test_data_prophet.columns:
+            if col not in ['ds']:
+                future[col] = test_data_prophet[col].values[:periods]
+
+        forecast = self.best_model.predict(future)
+
+        self.df_preds = forecast[['ds', 'yhat']]
+        self.df_preds.rename(columns={'ds': 'date_hour', 'yhat': 'cnt'}, inplace=True)
+
+    def save_predictions(self):
+        """
+        Save the predictions to a CSV file.
+        """
+        if hasattr(self, 'df_preds'):
+            self.df_preds.to_csv(f'Predictions/Prophet_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False)
+        else:
+            print("No predictions to save.")
