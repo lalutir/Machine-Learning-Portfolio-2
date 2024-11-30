@@ -976,3 +976,99 @@ class ProphetModel:
         else:
             print("No predictions to save.")
         
+class HybridModel:
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, models: dict):
+        """
+        Constructor for HybridModel.
+        
+        Parameters
+        ----------
+        train_data : pd.DataFrame
+            Training data.
+        test_data : pd.DataFrame
+            Testing data.
+        target : str
+            Name of the target column.
+        models : dict
+            Dictionary of models to use.
+            
+        Raises
+        ------
+        ValueError
+            If train_data or test_data is not a pandas DataFrame.
+        ValueError
+            If target is not a string.
+        ValueError
+            If models is not a dictionary.
+        """
+        
+        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
+            raise ValueError("train_data and test_data must be pandas DataFrames")
+        
+        if not isinstance(target, str):
+            raise ValueError("target must be a string")
+        
+        if not isinstance(models, dict):
+            raise ValueError("models must be a dictionary")
+        
+        self.train_data = train_data
+        self.test_data = test_data
+        self.target = target
+        self.X_train = train_data.drop(target, axis=1)
+        self.y_train = train_data[target]
+        self.models = models
+        self.model1 = list(models.items())[0][1]
+        self.model2 = list(models.items())[1][1]
+        
+    def fit(self):
+        """
+        Fit the model.
+        """
+        self.model1.fit(self.X_train, self.y_train)
+        train_predict1 = self.model1.predict(self.X_train)
+        
+        y_train_res = self.y_train - train_predict1
+        
+        self.model2.fit(self.X_train, y_train_res)
+        train_predict2 = self.model2.predict(self.X_train)
+        
+        self.train_predict = train_predict1 + train_predict2
+        
+        pred1_rmse = np.sqrt(mean_squared_error(self.y_train, train_predict1))
+        pred2_rmse = np.sqrt(mean_squared_error(self.y_train, train_predict1))
+        train_rmse = np.sqrt(mean_squared_error(self.y_train, self.train_predict))
+        
+        print(f'cnt prediction RMSE: {pred1_rmse}')
+        print(f'residual prediction RMSE: {pred2_rmse}')
+        print(f'total prediction RMSE: {train_rmse}')
+        
+    def predict(self, test_data_pred_col: list):
+        """
+        Predict on the test data.
+        
+        Parameters
+        ----------
+        test_data_pred_col : list
+            List of timestamps to predict.
+            
+        Raises
+        ------
+        ValueError
+            If test_data_pred_col is not a list.
+        """
+        
+        if not isinstance(test_data_pred_col, list):
+            raise ValueError("test_data_pred_col must be a list")
+        
+        self.test_predict1 = self.model1.predict(self.test_data)        
+        self.test_predict2 = self.model2.predict(self.test_data)
+        
+        self.test_predict = self.test_predict1 + self.test_predict2
+        
+        self.predictions = pd.DataFrame({'date_hour': test_data_pred_col, 'cnt': self.test_predict})
+        
+    def save_predictions(self):
+        """
+        Save the predictions to a CSV file.
+        """
+        self.predictions.to_csv(f'Predictions/hybrid_model_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv', index=False)
