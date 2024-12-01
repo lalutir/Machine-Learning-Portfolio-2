@@ -303,7 +303,7 @@ def create_timeseries_features(data: pd.DataFrame):
     data['date_hour'] = pd.to_datetime(data['date_hour'])
     data['year'] = data['date_hour'].dt.year
     data['month'] = data['date_hour'].dt.month
-    data['week'] = data['date_hour'].dt.week
+    data['week'] = data['date_hour'].dt.isocalendar().week
     data['day'] = data['date_hour'].dt.day
     data['hour'] = data['date_hour'].dt.hour
     data['day_of_week'] = data['date_hour'].dt.dayofweek
