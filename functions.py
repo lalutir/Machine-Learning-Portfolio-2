@@ -10,6 +10,7 @@ from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import VotingClassifier
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.model_selection import ParameterGrid
 from tqdm import tqdm
@@ -720,6 +721,75 @@ class GridSearch:
         path = f'Predictions/{model}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}_{path_add}.csv' if path_add is not None else f'Predictions/{model}_{dt.datetime.now().strftime("%Y%m%d%H%M%S")}.csv'
         
         self.df_preds.to_csv(path, index=False)
+        
+class SelfMadeEnsemble:
+    def __init__(self, train_data: pd.DataFrame, test_data: pd.DataFrame, target: str, models: list):
+        """Constructor for SelfMadeEnsemble
+        
+        Parameters
+        ----------
+        train_data : pd.DataFrame
+            Training data
+        test_data : pd.DataFrame
+            Testing data
+        target : str
+            Name of the target column
+        models : list
+            List of models to use
+            
+        Raises
+        ------
+        ValueError
+            If train_data or test_data is not a pandas DataFrame
+        ValueError
+            If target is not a string
+        ValueError
+            If models is not a list
+        """
+        
+        if not isinstance(train_data, pd.DataFrame) or not isinstance(test_data, pd.DataFrame):
+            raise ValueError("train_data and test_data must be pandas DataFrames")
+        
+        if not isinstance(target, str):
+            raise ValueError("target must be a string")
+        
+        if not isinstance(models, list):
+            raise ValueError("models must be a list")
+        
+        self.train_data = train_data
+        self.X_train = train_data.drop(target, axis=1)
+        self.y_train = train_data[target]
+        self.test_data = test_data
+        self.models = models
+        
+    def fit(self):
+        """Fit the ensemble model
+        """
+        self.vc = VotingClassifier(estimators=self.models, voting='soft')
+        self.vc.fit(self.X_train, self.y_train)
+        
+    def predict(self, test_data_pred_col: list):
+        """Predict on the test data
+        
+        Parameters
+        ----------
+        test_data_pred_col : list
+            List of timestamps to predict
+            
+        Raises
+        ------
+        ValueError
+            If test_data_pred_col is not a list
+        """
+        
+        if not isinstance(test_data_pred_col, list):
+            raise ValueError("test_data_pred_col must be a list")
+        
+        predictions = self.vc.predict(self.test_data)
+        self.predictions = pd.DataFrame({'date_hour': test_data_pred_col, 'cnt': predictions})
+        
+    def to_csv(self):
+        self.predictions.to_csv('Predictions/ensemble.csv', index=False)
         
 class CustomTimeSeriesSplit(TimeSeriesSplit):
     def __init__(self, n_splits, test_size):
