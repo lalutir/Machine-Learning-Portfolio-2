@@ -10,7 +10,7 @@ from statsmodels.tsa.deterministic import DeterministicProcess
 from statsmodels.tsa.stattools import adfuller
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import mean_squared_error
-from sklearn.ensemble import VotingClassifier
+from sklearn.ensemble import VotingRegressor
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from sklearn.model_selection import ParameterGrid
 from tqdm import tqdm
@@ -765,7 +765,7 @@ class SelfMadeEnsemble:
     def fit(self):
         """Fit the ensemble model
         """
-        self.vc = VotingClassifier(estimators=self.models, voting='soft')
+        self.vc = VotingRegressor(estimators=self.models, voting='soft')
         self.vc.fit(self.X_train, self.y_train)
         
     def predict(self, test_data_pred_col: list):
