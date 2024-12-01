@@ -765,7 +765,7 @@ class SelfMadeEnsemble:
     def fit(self):
         """Fit the ensemble model
         """
-        self.vc = VotingRegressor(estimators=self.models, voting='soft')
+        self.vc = VotingRegressor(estimators=self.models)
         self.vc.fit(self.X_train, self.y_train)
         
     def predict(self, test_data_pred_col: list):
